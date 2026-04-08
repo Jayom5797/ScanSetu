@@ -267,3 +267,4 @@ join public.products p on p.id = i.product_id and p.sku='SPN-A'
 join public.users u on u.email='rohan@example.com'
 where i.code='objA2'
 ON CONFLICT DO NOTHING;
+

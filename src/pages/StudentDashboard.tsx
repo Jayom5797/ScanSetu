@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import BarcodeScanner from '../components/BarcodeScanner'
@@ -13,7 +14,8 @@ type MyItem = {
 }
 
 export default function StudentDashboard() {
-  const { profile } = useAuth()
+  const { profile, signOut } = useAuth()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [stats, setStats] = useState({ myItems: 0, overdue: 0 })
@@ -30,9 +32,22 @@ export default function StudentDashboard() {
       try {
         const uid = (await supabase.auth.getUser()).data.user?.id
         if (!uid) return
-        // Find user record in users table
-        const { data: userRecord } = await supabase.from('users').select('id').eq('auth_user_id', uid).maybeSingle()
-        if (!userRecord) return
+
+        // Find user record by email instead of auth_user_id (column doesn't exist)
+        const { data: authUser } = await supabase.auth.getUser()
+        const email = authUser.user?.email
+        if (!email) return
+
+        const { data: userRecord } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', email)
+          .maybeSingle()
+
+        if (!userRecord) {
+          setLoading(false)
+          return
+        }
 
         // My current issued items with product & due date
         const { data, error } = await supabase
@@ -62,8 +77,7 @@ export default function StudentDashboard() {
   }, [])
 
   async function handleIssue(code: string) {
-    const { user } = useAuth()
-    if (!user) {
+    if (!profile) {
       setMessage({ type: 'error', text: 'You must be logged in to issue items' })
       return
     }
@@ -73,7 +87,7 @@ export default function StudentDashboard() {
 
     try {
       const due = dueDate ? new Date(dueDate) : undefined
-      const result = await issueItem(code, user.id, due)
+      const result = await issueItem(code, profile.id, due)
 
       if (result.success) {
         setMessage({ type: 'success', text: `Item "${code}" issued successfully!` })
@@ -81,9 +95,10 @@ export default function StudentDashboard() {
         setDueDate('')
         setScannerOpen(false)
         // Reload items
-        const uid = (await supabase.auth.getUser()).data.user?.id
-        if (uid) {
-          const { data: userRecord } = await supabase.from('users').select('id').eq('auth_user_id', uid).maybeSingle()
+        const { data: authUser2 } = await supabase.auth.getUser()
+        const email2 = authUser2.user?.email
+        if (email2) {
+          const { data: userRecord } = await supabase.from('users').select('id').eq('email', email2).maybeSingle()
           if (userRecord) {
             const { data, error } = await supabase
               .from('assignments')
@@ -127,6 +142,12 @@ export default function StudentDashboard() {
               onClick={() => setScannerOpen(true)}
             >
               Scan to Issue
+            </button>
+            <button
+              className="px-3 py-2 rounded-md border border-neutral-800 text-sm hover:bg-neutral-900"
+              onClick={async () => { await signOut(); navigate('/') }}
+            >
+              Sign out
             </button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import AuthModal from './components/AuthModal'
@@ -15,14 +15,24 @@ function Logo() {
 }
 
 function Nav({ onOpenAuth }: { onOpenAuth: () => void }) {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, loading } = useAuth()
   const dest = profile?.role === 'admin' ? '/dashboard' : '/student'
   const label = profile?.role === 'admin' ? 'Dashboard' : 'My Items'
   const navigate = useNavigate()
+
   async function handleSignOut() {
     await signOut()
     navigate('/')
   }
+
+  if (loading) return (
+    <header className="sticky top-0 z-50 border-b border-neutral-800/60 backdrop-blur bg-neutral-950/70">
+      <div className="mx-auto max-w-7xl px-4 py-4 flex items-center justify-between">
+        <Logo />
+      </div>
+    </header>
+  )
+
   return (
     <header className="sticky top-0 z-50 border-b border-neutral-800/60 backdrop-blur bg-neutral-950/70">
       <div className="mx-auto max-w-7xl px-4 py-4 flex items-center justify-between">
@@ -33,18 +43,24 @@ function Nav({ onOpenAuth }: { onOpenAuth: () => void }) {
           <a href="#contact" className="hover:text-white">Contact</a>
         </nav>
         <div className="flex items-center gap-3">
-          <Link to={dest} className="px-4 py-2 rounded-md border border-neutral-800 text-neutral-200 hover:bg-neutral-900">
-            {label}
-          </Link>
           {user ? (
-            <div className="flex items-center gap-2">
-              <span className="hidden sm:inline text-sm text-neutral-300">{profile?.full_name ?? user.email ?? 'Signed in'}</span>
-              <button onClick={handleSignOut} className="px-4 py-2 rounded-md border border-neutral-800 text-neutral-200 hover:bg-neutral-900">
+            <>
+              <Link to={dest} className="px-4 py-2 rounded-md border border-neutral-800 text-neutral-200 hover:bg-neutral-900 text-sm">
+                {label}
+              </Link>
+              <span className="hidden sm:inline text-sm text-neutral-400">{profile?.full_name ?? user.email}</span>
+              <button
+                onClick={handleSignOut}
+                className="px-4 py-2 rounded-md bg-neutral-200 text-neutral-900 text-sm font-medium hover:opacity-90"
+              >
                 Sign out
               </button>
-            </div>
+            </>
           ) : (
-            <button onClick={onOpenAuth} className="px-4 py-2 rounded-md bg-brand text-neutral-950 font-medium hover:opacity-90 transition-opacity">
+            <button
+              onClick={onOpenAuth}
+              className="px-4 py-2 rounded-md bg-brand text-neutral-950 font-medium hover:opacity-90 transition-opacity"
+            >
               Sign in / Register
             </button>
           )}
@@ -197,6 +213,17 @@ function Footer() {
 
 export default function App() {
   const [authOpen, setAuthOpen] = useState(false)
+  const { user, profile, loading } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    // Wait until both user AND profile are resolved before redirecting
+    if (loading) return
+    if (user && profile) {
+      navigate(profile.role === 'admin' ? '/dashboard' : '/student', { replace: true })
+    }
+  }, [user, profile, loading])
+
   return (
     <div className="min-h-screen">
       <Nav onOpenAuth={() => setAuthOpen(true)} />

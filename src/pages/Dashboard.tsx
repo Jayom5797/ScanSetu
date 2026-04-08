@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'
 import Inventory from './Inventory'
 import IssuePage from './IssuePage'
 import ReturnPage from './ReturnPage'
@@ -37,10 +38,12 @@ function Topbar({
   onMenuClick,
   onNavigate,
   onExportCSV,
+  onSignOut,
 }: {
   onMenuClick: () => void
   onNavigate: (page: string) => void
   onExportCSV: () => void
+  onSignOut: () => void
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
@@ -87,9 +90,15 @@ function Topbar({
         >
           Export CSV
         </button>
-        <Link to="/" className="px-3 py-2 rounded-md bg-neutral-200 text-neutral-900 text-sm font-medium hover:opacity-90">
+        <Link to="/" className="px-3 py-2 rounded-md border border-neutral-800 text-sm hover:bg-neutral-900">
           Home
         </Link>
+        <button
+          onClick={onSignOut}
+          className="px-3 py-2 rounded-md bg-neutral-200 text-neutral-900 text-sm font-medium hover:opacity-90"
+        >
+          Sign out
+        </button>
       </div>
     </div>
   )
@@ -186,6 +195,8 @@ function Table({ rows }: { rows: ActivityRow[] }) {
 }
 
 export default function Dashboard() {
+  const { signOut } = useAuth()
+  const navigate = useNavigate()
   const [currentPage, setCurrentPage] = useState('overview')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [stats, setStats] = useState({
@@ -463,6 +474,7 @@ export default function Dashboard() {
           onMenuClick={() => setMobileNavOpen(true)}
           onNavigate={setCurrentPage}
           onExportCSV={handleExportCSV}
+          onSignOut={async () => { await signOut(); navigate('/') }}
         />
         <div className="mt-4 md:mt-6 flex gap-6">
           <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />

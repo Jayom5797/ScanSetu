@@ -22,11 +22,22 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 async function upsertProfile(userId: string, email: string | null, fullName: string | null) {
-  // Try to upsert the profile; trigger will set role from admin_emails
-  const { error } = await supabase
+  // Only insert if profile doesn't exist yet - avoids firing triggers on every login
+  const { data: existing } = await supabase
     .from('profiles')
-    .upsert({ id: userId, email, full_name: fullName }, { onConflict: 'id' })
-  if (error) console.warn('Profile upsert failed:', error.message)
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle()
+  if (!existing) {
+    const role = await (async () => {
+      const { data } = await supabase.from('admin_emails').select('email').eq('email', email ?? '').maybeSingle()
+      return data ? 'admin' : 'student'
+    })()
+    const { error } = await supabase
+      .from('profiles')
+      .insert({ id: userId, email, full_name: fullName, role })
+    if (error) console.warn('Profile insert failed:', error.message)
+  }
 }
 
 async function loadProfile(userId: string): Promise<Profile | null> {
@@ -69,11 +80,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const u = session?.user ? { id: session.user.id, email: session.user.email ?? null } : null
       setUser(u)
       if (u) {
-        await upsertProfile(u.id, u.email, session?.user.user_metadata?.full_name ?? null)
         const p = await loadProfile(u.id)
         setProfile(p)
       } else {
         setProfile(null)
+        setLoading(false)
       }
     })
     return () => {
